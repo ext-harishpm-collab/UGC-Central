@@ -131,6 +131,7 @@ class RuleConfig(Base):
 class LedgerEntry(Base):
     __tablename__="ledger_entries"
     id:Mapped[str]=mapped_column(String(64),primary_key=True)
+    payment_transaction_id:Mapped[str|None]=mapped_column(String(64),index=True)
     payment_period:Mapped[str]=mapped_column(String(64),index=True)
     author_id:Mapped[str|None]=mapped_column(String(128),index=True)
     book_id:Mapped[str|None]=mapped_column(String(128),index=True)

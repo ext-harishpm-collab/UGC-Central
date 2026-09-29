@@ -28,7 +28,7 @@ def rebuild(period):
                 if i==len(weights)-1 and p.status=="SUCCESS":
                     prior=sum((Decimal(str(x.finance_amount)) for x in db.query(LedgerEntry).filter(LedgerEntry.payment_transaction_id==p.id).all()),Decimal("0"))
                     allocation=Decimal(str(p.amount_after_tax or 0))-prior
-                db.add(LedgerEntry(id=uuid.uuid4().hex,payment_period=period,author_id=p.author_id,book_id=e.book_id,show_id=e.show_id,content_type=e.content_type,
+                db.add(LedgerEntry(id=uuid.uuid4().hex,payment_transaction_id=p.id,payment_period=period,author_id=p.author_id,book_id=e.book_id,show_id=e.show_id,content_type=e.content_type,
                     reward_type=e.reward_type,source_earning_id=e.id,allocated_gross=e.gross or 0,allocated_net=e.net or 0,finance_amount=allocation,
                     finance_status=p.status,utr=p.utr,ledger_state="CLOSED" if p.status=="SUCCESS" else "RETRYABLE",allocation_method="PROPORTIONAL"))
                 created+=1

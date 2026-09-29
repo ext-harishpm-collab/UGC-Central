@@ -1,0 +1,1 @@
+# Phase 31 - Ledger stability pass\n\nAdded Finance payment transaction linkage to reconstructed ledger entries and moved reconstructed-ledger query routes to a dedicated namespace so they do not collide with the existing base ledger endpoints.\n
