@@ -1,5 +1,5 @@
 import {useEffect,useState} from "react";
-const NAV=["Dashboard","Monthly Cycle","Novel","Series","N2A/A2A","UWT","Ledger","Exceptions","Rules","Author","Book","Show","Historical Import","Calculation & QC"];
+const NAV=["Dashboard","Monthly Cycle","Payout","Novel","Series","N2A/A2A","UWT","Ledger","Exceptions","Rules","Author","Book","Show","Historical Import","Calculation & QC"];
 const typeFor=(p)=>p==="Novel"?"NOVEL":p==="Series"?"SERIES":p==="N2A/A2A"?"N2A/A2A":undefined;
 
 function Drill({kind,id,setPage,month}){
@@ -30,5 +30,7 @@ export default function App(){
  {!selected&&page==="Historical Import"&&<section className="panel"><h2>Historical Backfill</h2><p>Stage previous processed months while preserving provenance.</p></section>}
  {!selected&&page==="Calculation & QC"&&<section className="panel"><h2>Calculation + Mandatory QC</h2><p>Calculation, configurable caps, batch QC and freeze controls are available in the backend.</p><a href="/docs" target="_blank">Open API Docs</a></section>}
  {!selected&&["Author","Book","Show"].includes(page)&&<section className="panel"><h2>{page} Explorer</h2><p>Double-click an Author, Book or Show in an output table to open its 360-degree source-backed view.</p></section>}
- </main></div>
+  
+ {page==="Payout"&&<section className="panel"><h2>Author Payout Control</h2><p>Preview uses persisted source controls before batch creation.</p><div className="ruleGrid"><label>Marketing Cap %<input type="number" defaultValue="30"/></label><label>COP Cap %<input type="number" defaultValue="30"/></label><label>TDS Override %<input type="number" placeholder="Use PAN master"/></label></div><p className="muted">Next action is to calculate, run line QC, and freeze only after all required controls pass.</p><a href="/docs" target="_blank">Open API Docs</a></section>}
+</main></div>
 }

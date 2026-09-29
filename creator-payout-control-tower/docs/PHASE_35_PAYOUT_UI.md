@@ -1,0 +1,1 @@
+# Phase 35 - Payout control UI\n\nAdded a dedicated Payout navigation entry and operator control surface for Marketing/COP cap settings and TDS override visibility. Backend payout preview, batch QC and freeze endpoints remain the source of truth.\n
