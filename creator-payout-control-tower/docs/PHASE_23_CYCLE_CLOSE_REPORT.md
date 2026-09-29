@@ -1,0 +1,1 @@
+# Phase 23 - Cycle close report\n\nThe close report reconciles approved payout net, Finance processed net, SUCCESS/FAILED/REVERSED/UNMATCHED counts and amounts, and pending payout lines. UNMATCHED results keep the cycle in CLOSE_REVIEW.\n

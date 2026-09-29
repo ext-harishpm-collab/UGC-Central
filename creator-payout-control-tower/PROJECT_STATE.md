@@ -1,24 +1,15 @@
 # PROJECT_STATE
 
 ## Current Status
-Phase 16 - Cycle readiness and payout-batch QC are added.
+Phase 23 - Monthly close report added. The platform now covers two-dump monthly processing, persisted earnings, source/QC exports, author-level payout preview/batches, QC-gated freeze, fixed UWT export, Finance UWT result reconciliation, and cycle-close reporting.
 
-## Controls
-- Immutable source staging and provenance
-- UWT fixed 13-column interface
-- SUCCESS / FAILED / REVERSED / UNMATCHED normalization
-- SUCCESS-only bank-payment evidence
-- Novel / Series / N2A/A2A separation
-- Author payout preview and configurable caps
-- Recovery / adjustment staging
-- QC-gated payout batch freeze
-- Cycle readiness checks for missing Author/Book, unmatched payments and duplicate UTRs
-- Batch QC sets each payout line PASS/BLOCK
+## Remaining production validation
+- Run the real May-August processed files through the local application.
+- Compare exact source row counts and field mappings against processed outputs.
+- Validate contract RS, PAN/TDS, recovery, adjustment, compliance, N2A/A2A parent-child and Novel/Series classification using the source workbooks.
+- Confirm Finance matching keys and UWT field-level parity.
+- Correct any differences found by reconciliation reports before production use.
+- Then connect Lovable for the polished frontend/auth/deployment.
 
-## Next
-1. Validate exact field mappings against May-August actual files.
-2. Persist contract/PAN/TDS/compliance QC from their true source columns.
-3. Complete exact Show-level Finance-to-ledger matching.
-4. Generate fixed UWT export from approved payout lines.
-5. Run system-vs-processed parity reports.
-6. Finalize UI then move to Lovable.
+## Core invariant
+No payout batch should be considered frozen/exportable until the required QC and reconciliation gates pass.
