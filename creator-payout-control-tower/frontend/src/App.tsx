@@ -1,68 +1,27 @@
-import { useEffect, useState } from "react";
+import {useEffect,useState} from "react";
+const NAV=["Dashboard","Monthly Cycle","Novel","Series","N2A/A2A","UWT","Ledger","Exceptions","Rules","Author","Book","Show","Historical Import","Calculation & QC"];
+const typeFor=(p:string)=>p==="Novel"?"NOVEL":p==="Series"?"SERIES":p==="N2A/A2A"?"N2A/A2A":undefined;
 
-const NAV = ["Dashboard","Monthly Cycle","Novel","Series","N2A/A2A","UWT","Ledger","Exceptions","Rules","Author","Book","Show","Historical Import","Calculation & QC"];
-const typeFor = (p:string) => p === "Novel" ? "NOVEL" : p === "Series" ? "SERIES" : p === "N2A/A2A" ? "N2A/A2A" : undefined;
-
-export default function App() {
-  const [page,setPage] = useState("Dashboard");
-  const [month,setMonth] = useState("August 2026");
-  const [api,setApi] = useState("checking");
-  const [rows,setRows] = useState<any[]>([]);
-  const [summary,setSummary] = useState<any>(null);
-  const [exceptions,setExceptions] = useState<any[]>([]);
-  const [rules,setRules] = useState<any>(null);
-
-  useEffect(() => {
-    fetch("/api/health").then(r=>r.json()).then(()=>setApi("online")).catch(()=>setApi("offline"));
-  }, []);
-
-  useEffect(() => {
-    if (["Dashboard","Monthly Cycle","Novel","Series","N2A/A2A","Ledger"].includes(page)) loadLedger();
-    if (page === "Exceptions") loadExceptions();
-    if (page === "Rules") loadRules();
-  }, [page,month]);
-
-  async function loadLedger() {
-    const t=typeFor(page);
-    const url=t ? `/api/ledger?month=${encodeURIComponent(month)}&content_type=${encodeURIComponent(t)}` : `/api/ledger?month=${encodeURIComponent(month)}`;
-    const data=await fetch(url).then(r=>r.json()).catch(()=>[]);
-    const s=await fetch(`/api/month/breakdown?month=${encodeURIComponent(month)}`).then(r=>r.json()).catch(()=>null);
-    setRows(Array.isArray(data)?data:[]); setSummary(s);
-  }
-
-  async function loadExceptions() { setExceptions(await fetch(`/api/exceptions?period=${encodeURIComponent(month)}`).then(r=>r.json()).catch(()=>[])); }
-  async function loadRules() { setRules(await fetch(`/api/config/rules?period=${encodeURIComponent(month)}`).then(r=>r.json()).catch(()=>null)); }
-
-  const stats=summary?.status || {};
-  return <div className="app">
-    <aside className="sidebar"><div className="brand">Creator Payout<br/>Control Tower</div>
-      {NAV.map(x=><div key={x} className={x===page?"nav active":"nav"} onClick={()=>setPage(x)}>{x}</div>)}
-    </aside>
-    <main className="main">
-      <header><div><div className="eyebrow">LOCAL DEVELOPMENT</div><h1>{page}</h1><p>{month} · API {api}</p></div>
-        <select value={month} onChange={e=>setMonth(e.target.value)}><option>August 2026</option><option>July 2026</option><option>June 2026</option><option>May 2026</option></select>
-      </header>
-
-      {["Dashboard","Novel","Series","N2A/A2A","Ledger"].includes(page) && <>
-        <section className="cards">
-          {[["Rows",rows.length],["Success",stats.SUCCESS?.count||0],["Failed",stats.FAILED?.count||0],["Reversed",stats.REVERSED?.count||0],["Unmatched",stats.UNMATCHED?.count||0],["Content Groups",Object.keys(summary?.content||{}).length]].map(([a,b])=><div className="card" key={a}><span>{a}</span><strong>{b}</strong></div>)}
-        </section>
-        <section className="panel"><h2>Show-Level Ledger</h2><p>{page==="Dashboard"?"All content":page}</p>
-          <div className="tableWrap"><table><thead><tr><th>Show ID</th><th>Book ID</th><th>Author ID</th><th>Content</th><th>Net</th><th>Status</th><th>Ledger</th><th>UTR</th></tr></thead>
-          <tbody>{rows.slice(0,500).map(r=><tr key={r.payment_id}><td>{r.show_id||"-"}</td><td>{r.book_id||"-"}</td><td>{r.author_id||"-"}</td><td>{r.content_type||"UNKNOWN"}</td><td>{r.amount_after_tax==null?"-":"₹"+Number(r.amount_after_tax).toLocaleString("en-IN",{minimumFractionDigits:2})}</td><td><span className={"pill "+String(r.status).toLowerCase()}>{r.status}</span></td><td>{r.ledger_state}</td><td>{r.utr||"-"}</td></tr>)}</tbody></table></div>
-        </section>
-      </>}
-
-      {page==="Monthly Cycle" && <section className="grid2"><div className="panel"><h2>Monthly Breakdown</h2><pre className="result">{JSON.stringify(summary,null,2)}</pre></div><div className="panel"><h2>Processing Gate</h2><div className="checks"><div>✓ Import validation</div><div>✓ Calculation layer</div><div>✓ Mandatory QC layer</div><div>✓ UWT reconciliation layer</div><div>○ Historical parity validation</div></div></div></section>}
-
-      {page==="Exceptions" && <section className="panel"><h2>Exception Queue · {exceptions.length}</h2>{exceptions.length===0?<p>No open exceptions for {month}.</p>:<table><thead><tr><th>Rule</th><th>Severity</th><th>Entity</th><th>Message</th></tr></thead><tbody>{exceptions.map((x:any,i)=><tr key={i}><td>{x.rule_id}</td><td>{x.severity}</td><td>{x.entity_type} / {x.entity_id}</td><td>{x.message}</td></tr>)}</tbody></table>}</section>}
-
-      {page==="Rules" && <section className="panel"><h2>Effective Rules</h2><pre className="result">{JSON.stringify(rules,null,2)}</pre></section>}
-
-      {page==="UWT" && <section className="panel"><h2>Finance UWT</h2><p>Use the backend API docs to test the fixed 13-column UWT import/export while the frontend controls are being hardened.</p><a href="/docs" target="_blank">Open API docs</a></section>}
-      {page==="Historical Import" && <section className="panel"><h2>Historical Import</h2><p>Upload previous-month processed workbooks through the existing import endpoint.</p><a href="/docs" target="_blank">Open API docs</a></section>}
-      {page==="Calculation & QC" && <section className="panel"><h2>Calculation & QC</h2><p>Calculation and mandatory QC endpoints are live in the local backend.</p><a href="/docs" target="_blank">Open API docs</a></section>}
-      {["Author","Book","Show"].includes(page) && <section className="panel"><h2>{page} Explorer</h2><p>Entity-level APIs are available; the detailed drill-down UI will be connected after historical parity testing.</p></section>}
-    </main>
-  </div>;
+export default function App(){
+ const[page,setPage]=useState("Dashboard"),[month,setMonth]=useState("August 2026"),[api,setApi]=useState("checking");
+ const[rows,setRows]=useState<any[]>([]),[summary,setSummary]=useState<any>(null),[exceptions,setExceptions]=useState<any[]>([]);
+ const[inc,setInc]=useState<File|null>(null),[rs,setRs]=useState<File|null>(null),[processing,setProcessing]=useState(false),[run,setRun]=useState<any>(null);
+ useEffect(()=>{fetch("/api/health").then(r=>r.json()).then(()=>setApi("online")).catch(()=>setApi("offline"))},[]);
+ useEffect(()=>{if(["Dashboard","Novel","Series","N2A/A2A","Ledger"].includes(page))loadLedger();if(page==="Exceptions")loadExceptions()},[page,month]);
+ async function loadLedger(){const t=typeFor(page);const url=t?`/api/ledger?month=${encodeURIComponent(month)}&content_type=${encodeURIComponent(t)}`:`/api/ledger?month=${encodeURIComponent(month)}`;const a=await fetch(url).then(r=>r.json()).catch(()=>[]);const b=await fetch(`/api/month/breakdown?month=${encodeURIComponent(month)}`).then(r=>r.json()).catch(()=>null);setRows(Array.isArray(a)?a:[]);setSummary(b)}
+ async function loadExceptions(){setExceptions(await fetch(`/api/exceptions?period=${encodeURIComponent(month)}`).then(r=>r.json()).catch(()=>[]))}
+ async function process(){if(!inc||!rs)return;setProcessing(true);setRun(null);const fd=new FormData();fd.append("incentive_dump",inc);fd.append("revenue_share_dump",rs);try{const r=await fetch(`/api/monthly/process-two-dumps?period=${encodeURIComponent(month)}`,{method:"POST",body:fd});const d=await r.json();setRun(d);await loadLedger()}finally{setProcessing(false)}}
+ const download=(path:string)=>window.open(path,"_blank");
+ const stats=summary?.status||{};
+ return <div className="app"><aside className="sidebar"><div className="brand">Creator Payout<br/>Control Tower</div>{NAV.map(x=><div key={x} className={x===page?"nav active":"nav"} onClick={()=>setPage(x)}>{x}</div>)}</aside><main className="main">
+ <header><div><div className="eyebrow">LOCAL DEVELOPMENT · API {api}</div><h1>{page}</h1><p>{month}</p></div><select value={month} onChange={e=>setMonth(e.target.value)}><option>August 2026</option><option>July 2026</option><option>June 2026</option><option>May 2026</option></select></header>
+ {page==="Monthly Cycle"&&<><section className="panel"><h2>Upload the two monthly Tech dumps</h2><p>Incentive Dump + Revenue Share Dump are processed together and persisted with source lineage.</p><div className="uploadGrid"><label>Incentive Dump<input type="file" accept=".xlsx,.xlsm" onChange={e=>setInc(e.target.files?.[0]||null)}/></label><label>Revenue Share Dump<input type="file" accept=".xlsx,.xlsm" onChange={e=>setRs(e.target.files?.[0]||null)}/></label></div><button disabled={!inc||!rs||processing} onClick={process}>{processing?"Processing...":"Process Monthly Cycle"}</button></section>{run&&<><section className="cards">{[["Incentive Rows",run.input_summary?.incentive_rows||0],["RS Rows",run.input_summary?.revenue_share_rows||0],["Total Source Rows",run.input_summary?.total_source_rows||0],["QC Block",run.qc_summary?.BLOCK||0],["QC Review",run.qc_summary?.REVIEW||0],["Authors",run.author_level_rows?.length||0]].map(([a,b])=><div className="card" key={a}><span>{a}</span><strong>{b}</strong></div>)}</section><section className="panel"><div className="panelHead"><div><h2>Run Status: {run.run_status}</h2><p>Every output row retains source references for cross-verification.</p></div><div className="buttons"><button onClick={()=>download(`/api/monthly/author-level/export?period=${encodeURIComponent(month)}`)}>Export Author CSV</button><button onClick={()=>download(`/api/monthly/qc/export?period=${encodeURIComponent(month)}`)}>Export QC CSV</button></div></div><table><thead><tr><th>Author ID</th><th>Incentive</th><th>Revenue Share</th><th>Gross</th><th>Content</th><th>Sources</th></tr></thead><tbody>{(run.author_level_rows||[]).slice(0,300).map((r:any)=><tr key={r.author_id}><td>{r.author_id}</td><td>{r.incentive_gross}</td><td>{r.revenue_share_gross}</td><td>{r.gross}</td><td>{r.content_types}</td><td>{r.source_references}</td></tr>)}</tbody></table></section></>}</>}
+ {["Dashboard","Novel","Series","N2A/A2A","Ledger"].includes(page)&&<><section className="cards">{[["Rows",rows.length],["Success",stats.SUCCESS?.count||0],["Failed",stats.FAILED?.count||0],["Reversed",stats.REVERSED?.count||0],["Unmatched",stats.UNMATCHED?.count||0],["Content Groups",Object.keys(summary?.content||{}).length]].map(([a,b])=><div className="card" key={a}><span>{a}</span><strong>{b}</strong></div>)}</section><section className="panel"><h2>Show-Level Ledger</h2><div className="tableWrap"><table><thead><tr><th>Show ID</th><th>Book ID</th><th>Author ID</th><th>Content</th><th>Net</th><th>Status</th><th>Ledger</th><th>UTR</th></tr></thead><tbody>{rows.slice(0,500).map((r:any)=><tr key={r.payment_id}><td>{r.show_id||"-"}</td><td>{r.book_id||"-"}</td><td>{r.author_id||"-"}</td><td>{r.content_type}</td><td>{r.amount_after_tax==null?"-":"₹"+Number(r.amount_after_tax).toLocaleString("en-IN",{minimumFractionDigits:2})}</td><td><span className={"pill "+String(r.status).toLowerCase()}>{r.status}</span></td><td>{r.ledger_state}</td><td>{r.utr||"-"}</td></tr>)}</tbody></table></div></section></>}
+ {page==="Exceptions"&&<section className="panel"><h2>Exception Queue · {exceptions.length}</h2>{exceptions.length===0?<p>No open exceptions.</p>:<table><thead><tr><th>Rule</th><th>Severity</th><th>Entity</th><th>Message</th></tr></thead><tbody>{exceptions.map((x:any,i)=><tr key={i}><td>{x.rule_id}</td><td>{x.severity}</td><td>{x.entity_type}/{x.entity_id}</td><td>{x.message}</td></tr>)}</tbody></table>}</section>}
+ {page==="Rules"&&<section className="panel"><h2>Effective Rules</h2><p>Marketing, COP and payment threshold are configurable and effective-dated.</p></section>}
+ {page==="Historical Import"&&<section className="panel"><h2>Historical Backfill</h2><p>Use the importer to stage prior processed months and preserve source provenance.</p></section>}
+ {page==="UWT"&&<section className="panel"><h2>UWT Finance Result</h2><p>Fixed 13-column Finance result import/export is available through the API documentation.</p><a href="/docs" target="_blank">Open API Docs</a></section>}
+ {page==="Calculation & QC"&&<section className="panel"><h2>Calculation + Mandatory QC</h2><p>Calculation, cap simulation and QC endpoints are live. Batch freeze remains gated.</p><a href="/docs" target="_blank">Open API Docs</a></section>}
+ {["Author","Book","Show"].includes(page)&&<section className="panel"><h2>{page} Explorer</h2><p>Backend 360-degree entity endpoints are available; detailed drill-down UI follows parity validation.</p></section>}
+ </main></div>
 }

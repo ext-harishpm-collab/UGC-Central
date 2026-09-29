@@ -1,0 +1,1 @@
+# Phase 19 - Monthly Cycle UI\n\nThe local browser now has a dedicated Monthly Cycle screen for the two Tech dumps. It displays input counts, QC block/review counts, author-level output with source references, and direct Author CSV and QC CSV exports.\n
