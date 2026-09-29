@@ -1,3 +1,1 @@
--- Phase 13 schema additions
-CREATE TABLE IF NOT EXISTS recovery_events(id TEXT PRIMARY KEY,payment_period TEXT,author_id TEXT,opening_outstanding NUMERIC,applied NUMERIC,closing_outstanding NUMERIC,source_file TEXT,source_sheet TEXT,source_row INTEGER);
-CREATE TABLE IF NOT EXISTS adjustments(id TEXT PRIMARY KEY,payment_period TEXT,author_id TEXT,book_id TEXT,show_id TEXT,amount NUMERIC,reason TEXT,currency TEXT,reward_type TEXT,approved_by TEXT,status TEXT DEFAULT 'PENDING');
+CREATE TABLE IF NOT EXISTS ledger_entries(id TEXT PRIMARY KEY,payment_period TEXT,author_id TEXT,book_id TEXT,show_id TEXT,content_type TEXT,reward_type TEXT,source_earning_id TEXT,allocated_gross NUMERIC,allocated_net NUMERIC,finance_amount NUMERIC,finance_status TEXT,utr TEXT,ledger_state TEXT,allocation_method TEXT,created_at TEXT);

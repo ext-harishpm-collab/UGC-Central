@@ -126,3 +126,23 @@ class RuleConfig(Base):
     id:Mapped[str]=mapped_column(String(64),primary_key=True);rule_key:Mapped[str]=mapped_column(String(128),index=True);scope_type:Mapped[str]=mapped_column(String(64));scope_value:Mapped[str|None]=mapped_column(String(128))
     value_numeric:Mapped[Decimal|None]=mapped_column(Numeric(18,6));value_text:Mapped[str|None]=mapped_column(String(255));effective_from:Mapped[datetime|None]=mapped_column(DateTime);effective_to:Mapped[datetime|None]=mapped_column(DateTime)
     is_active:Mapped[bool]=mapped_column(Boolean,default=True);approved_by:Mapped[str|None]=mapped_column(String(128));reason:Mapped[str|None]=mapped_column(Text)
+
+
+class LedgerEntry(Base):
+    __tablename__="ledger_entries"
+    id:Mapped[str]=mapped_column(String(64),primary_key=True)
+    payment_period:Mapped[str]=mapped_column(String(64),index=True)
+    author_id:Mapped[str|None]=mapped_column(String(128),index=True)
+    book_id:Mapped[str|None]=mapped_column(String(128),index=True)
+    show_id:Mapped[str|None]=mapped_column(String(128),index=True)
+    content_type:Mapped[str|None]=mapped_column(String(32),index=True)
+    reward_type:Mapped[str|None]=mapped_column(String(64),index=True)
+    source_earning_id:Mapped[str|None]=mapped_column(String(64),index=True)
+    allocated_gross:Mapped[Decimal]=mapped_column(Numeric(18,4),default=0)
+    allocated_net:Mapped[Decimal]=mapped_column(Numeric(18,4),default=0)
+    finance_amount:Mapped[Decimal]=mapped_column(Numeric(18,4),default=0)
+    finance_status:Mapped[str]=mapped_column(String(32),index=True)
+    utr:Mapped[str|None]=mapped_column(String(128),index=True)
+    ledger_state:Mapped[str]=mapped_column(String(32),default="OPEN",index=True)
+    allocation_method:Mapped[str]=mapped_column(String(64),default="PROPORTIONAL")
+    created_at:Mapped[datetime]=mapped_column(DateTime,default=datetime.utcnow)
