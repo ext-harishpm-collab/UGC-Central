@@ -1,5 +1,6 @@
 from pathlib import Path
 from fastapi import APIRouter,UploadFile,File,HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from ..services.status import normalize_payment_status
 from ..services.import_service import import_uploaded_workbook,list_imports
@@ -10,28 +11,23 @@ from ..services.rules_service import get_rules,save_rule
 from ..services.calculation_service import calculate
 from ..services.qc_service import run_qc
 from ..services.reconciliation_service import reconcile
-from ..services.uwt_service import FIXED_COLUMNS
-from ..services.uwt_import_service import import_uwt_workbook,fixed_uwt_rows
 from ..services.month_service import month_breakdown
 from ..services.historical_service import backfill_files
-from ..services.earning_service import ingest_earnings,preview_author_payouts
+from ..services.earning_service import ingest_earnings
 from ..services.payout_service import build_preview
+from ..services.batch_service import create_draft_batch,list_batches,freeze_batch
+from ..services.uwt_import_service import import_uwt_workbook,fixed_uwt_rows
+from ..services.uwt_export_service import build_uwt_workbook
 from ..services.exception_service import open_exceptions
 from ..services.entity_service import author_360,content_360
 import tempfile,shutil
 
 router=APIRouter()
-class RulePayload(BaseModel):
-    rule_key:str;value:float|None=None;effective_from:str|None=None;effective_to:str|None=None;reason:str|None=None;approved_by:str|None=None
-class CalcPayload(BaseModel):
-    incentive:float=0;revenue_share:float=0;other:float=0;marketing:float=0;platform:float=0;cop:float=0;flat:float=0;recovery:float=0;adjustment:float=0;tds_rate:float=0
-class QCInput(BaseModel):
-    author_id:str|None=None;content_type:str|None=None;incentive:float=0;contract_rs:float|None=None;product_rs:float|None=None;bank_ok:bool=False;pan_ok:bool=False;previously_paid:bool=False;recovery_double:bool=False;adjustment_reason:bool=True;payment_threshold:float=100;final_net:float=0
-class ReconInput(BaseModel):
-    payout_id:str|None=None;utr:str|None=None;author_id:str|None=None;book_id:str|None=None;amount:float|None=None;raw_status:str|None=None
-
+class RulePayload(BaseModel):rule_key:str;value:float|None=None;effective_from:str|None=None;effective_to:str|None=None;reason:str|None=None;approved_by:str|None=None
+class CalcPayload(BaseModel):incentive:float=0;revenue_share:float=0;other:float=0;marketing:float=0;platform:float=0;cop:float=0;flat:float=0;recovery:float=0;adjustment:float=0;tds_rate:float=0
+class QCInput(BaseModel):author_id:str|None=None;content_type:str|None=None;incentive:float=0;contract_rs:float|None=None;product_rs:float|None=None;bank_ok:bool=False;pan_ok:bool=False;previously_paid:bool=False;recovery_double:bool=False;adjustment_reason:bool=True;payment_threshold:float=100;final_net:float=0
 @router.get("/health")
-def health():return {"status":"ok","phase":10}
+def health():return {"status":"ok","phase":11}
 @router.get("/status/normalize/{raw_status}")
 def status(raw_status:str):return {"input":raw_status,"normalized":normalize_payment_status(raw_status).value}
 @router.get("/config/rules")
@@ -46,19 +42,11 @@ def imports():return list_imports()
 def import_upload(file:UploadFile=File(...)):
     try:return import_uploaded_workbook(file)
     except Exception as e:raise HTTPException(500,f"Import failed: {e}")
-@router.post("/import/inspect")
-def import_inspect(file:UploadFile=File(...)):
-    name=file.filename or ""
-    if not name.lower().endswith((".xlsx",".xlsm")):raise HTTPException(400,"Only XLSX/XLSM are supported")
-    with tempfile.NamedTemporaryFile(suffix=Path(name).suffix,delete=False) as tmp:shutil.copyfileobj(file.file,tmp);path=tmp.name
-    try:return inspect_workbook(path)
-    finally:Path(path).unlink(missing_ok=True)
 @router.post("/historical/backfill")
 def historical_backfill(files:list[UploadFile]=File(...)):
     paths=[]
     try:
         for f in files:
-            if not (f.filename or "").lower().endswith((".xlsx",".xlsm")):raise HTTPException(400,"XLSX/XLSM only")
             with tempfile.NamedTemporaryFile(suffix=Path(f.filename or "").suffix,delete=False) as tmp:shutil.copyfileobj(f.file,tmp);paths.append(tmp.name)
         return backfill_files(paths)
     finally:
@@ -70,21 +58,30 @@ def historical_earnings(file:UploadFile=File(...),period:str|None=None):
     finally:Path(path).unlink(missing_ok=True)
 @router.post("/uwt/import")
 def uwt_import(file:UploadFile=File(...)):
-    name=file.filename or ""
-    if not name.lower().endswith((".xlsx",".xlsm")):raise HTTPException(400,"Only XLSX/XLSM are supported")
-    with tempfile.NamedTemporaryFile(suffix=Path(name).suffix,delete=False) as tmp:shutil.copyfileobj(file.file,tmp);path=tmp.name
+    with tempfile.NamedTemporaryFile(suffix=Path(file.filename or "").suffix,delete=False) as tmp:shutil.copyfileobj(file.file,tmp);path=tmp.name
     try:return import_uwt_workbook(path)
     finally:Path(path).unlink(missing_ok=True)
 @router.get("/uwt/rows")
 def uwt_rows(period:str|None=None,status:str|None=None):return fixed_uwt_rows(period,status)
+@router.get("/uwt/export")
+def uwt_export(period:str|None=None,status:str|None=None):
+    buf=build_uwt_workbook(period,status)
+    return StreamingResponse(buf,media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition":"attachment; filename=uwt_final.xlsx"})
+@router.get("/payout/preview")
+def payout_preview(period:str,marketing_cap:float|None=None,cop_cap:float|None=None,cap_mode:str="INDIVIDUAL",tds_rate:float=0):return build_preview(period,marketing_cap,cop_cap,cap_mode,tds_rate)
+@router.post("/payout/batch")
+def payout_batch(period:str,marketing_cap:float|None=None,cop_cap:float|None=None,cap_mode:str="INDIVIDUAL",tds_rate:float=0):return create_draft_batch(period,marketing_cap,cop_cap,cap_mode,tds_rate)
+@router.get("/payout/batches")
+def batches(period:str|None=None):return list_batches(period)
+@router.post("/payout/batch/{batch_id}/freeze")
+def batch_freeze(batch_id:str):return freeze_batch(batch_id)
+@router.get("/exceptions")
+def exceptions(period:str|None=None):return open_exceptions(period)
 @router.get("/author/{author_id}/360")
 def author_view(author_id:str,period:str|None=None):return author_360(author_id,period)
 @router.get("/content/{content_id}/360")
 def content_view(content_id:str,period:str|None=None):return content_360(content_id,period)
-@router.get("/payout/preview")
-def payout_preview(period:str,marketing_cap:float|None=None,cop_cap:float|None=None,cap_mode:str="INDIVIDUAL",tds_rate:float=0):return build_preview(period,marketing_cap,cop_cap,cap_mode,tds_rate)
-@router.get("/exceptions")
-def exceptions(period:str|None=None):return open_exceptions(period)
 @router.get("/master/summary")
 def summary():return master_summary()
 @router.get("/ledger")
@@ -93,11 +90,7 @@ def ledger_rows(month:str|None=None,content_type:str|None=None,status:str|None=N
 def ledger_sum(month:str|None=None):return ledger_summary(month)
 @router.get("/month/breakdown")
 def breakdown(month:str|None=None):return month_breakdown(month)
-@router.get("/uwt/fixed-columns")
-def uwt_columns():return {"columns":FIXED_COLUMNS}
 @router.post("/calculate")
 def calc(payload:CalcPayload):return calculate(payload.model_dump())
 @router.post("/qc/run")
 def qc(payload:QCInput):return run_qc(payload.model_dump())
-@router.post("/reconcile")
-def recon(payload:ReconInput):return reconcile(**payload.model_dump())
