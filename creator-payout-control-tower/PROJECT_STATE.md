@@ -1,27 +1,24 @@
 # PROJECT_STATE
 
 ## Current Status
-Phase 15 - QC persistence, contract/PAN rule adapters and deterministic Show-level ledger reconstruction foundation.
+Phase 16 - Cycle readiness and payout-batch QC are added.
 
-## Implemented
-- Historical XLSX/XLSM import and immutable provenance
-- Author/Book/Show and bank history foundation
-- Incentive/Revenue Share earnings ingestion
-- N2A/A2A incentive exclusion
+## Controls
+- Immutable source staging and provenance
+- UWT fixed 13-column interface
+- SUCCESS / FAILED / REVERSED / UNMATCHED normalization
+- SUCCESS-only bank-payment evidence
+- Novel / Series / N2A/A2A separation
 - Author payout preview and configurable caps
-- Recovery/adjustment staging
-- Payout batch and QC-gated freeze
-- UWT import/status normalization
-- Show-level ledger rebuild foundation
-- Persistent QC results and blocking exception creation
-- Contract RS comparison adapter
-- PAN/TDS normalization adapter
+- Recovery / adjustment staging
+- QC-gated payout batch freeze
+- Cycle readiness checks for missing Author/Book, unmatched payments and duplicate UTRs
+- Batch QC sets each payout line PASS/BLOCK
 
 ## Next
-1. Field-level validation against real May-August workbooks.
-2. Complete contract master parsing.
-3. Complete PAN/TDS source import and effective rate logic.
-4. Persist payout calculation lineages.
-5. Generate exact fixed UWT export from approved/frozen payout lines.
-6. Build system-vs-workbook reconciliation report at Author, Book, Show and content-type levels.
-7. Harden UI and then move to Lovable.
+1. Validate exact field mappings against May-August actual files.
+2. Persist contract/PAN/TDS/compliance QC from their true source columns.
+3. Complete exact Show-level Finance-to-ledger matching.
+4. Generate fixed UWT export from approved payout lines.
+5. Run system-vs-processed parity reports.
+6. Finalize UI then move to Lovable.

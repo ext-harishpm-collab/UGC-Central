@@ -1,0 +1,1 @@
+# Phase 16 - Cycle readiness and batch QC\n\nCycle readiness and batch QC are now exposed through the local API. Readiness checks are conservative and do not auto-correct data. Batch QC prevents a batch from being considered ready unless all payout lines pass.\n

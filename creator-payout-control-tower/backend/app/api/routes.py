@@ -18,7 +18,7 @@ from ..services.earning_service import ingest_earnings
 from ..services.payout_service import build_preview
 from ..services.batch_service import create_draft_batch,list_batches,freeze_batch
 from ..services.entity_service import author_360,content_360
-from ..services.recovery_service import ingest_recovery_and_adjustments
+from ..services.recovery_service import ingest_recovery_and_adjustments\nfrom ..services.readiness_service import cycle_readiness\nfrom ..services.batch_qc_service import run_batch_qc
 from ..services.tds_service import normalize_pan_status,effective_tds_rate
 from fastapi.responses import StreamingResponse
 import tempfile,shutil
@@ -86,7 +86,7 @@ def exceptions(period:str|None=None):
 def author_view(author_id:str,period:str|None=None):return author_360(author_id,period)
 @router.get("/content/{content_id}/360")
 def content_view(content_id:str,period:str|None=None):return content_360(content_id,period)
-@router.get("/master/summary")
+@router.get("/cycle/readiness")\ndef cycle_readiness_endpoint(period:str): return cycle_readiness(period)\n\n@router.post("/payout/batch/{batch_id}/qc")\ndef payout_batch_qc(batch_id:str): return run_batch_qc(batch_id)\n\n@router.get("/master/summary")
 def summary():return master_summary()
 @router.get("/ledger")
 def ledger_rows(month:str|None=None,content_type:str|None=None,status:str|None=None,show_id:str|None=None,book_id:str|None=None,author_id:str|None=None):return list_ledger(month,content_type,status,show_id,book_id,author_id)
