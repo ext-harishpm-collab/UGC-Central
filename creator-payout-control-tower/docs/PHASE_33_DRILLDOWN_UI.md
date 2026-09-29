@@ -1,0 +1,1 @@
+# Phase 33 - Source-backed drill-down UI\n\nThe local UI now opens Author and Content 360 views from the table, with month filtering. Double-click an Author ID, Book ID or Show ID in the ledger/author output. This is designed to let a reviewer cross-check the exported Author Level amount back to source-backed records before final payout handoff.\n
