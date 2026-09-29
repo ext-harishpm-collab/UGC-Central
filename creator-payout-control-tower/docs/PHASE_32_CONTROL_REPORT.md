@@ -1,0 +1,1 @@
+# Phase 32 - Monthly control report\n\nThe control report combines source, eligibility, content-type, QC, payout batch, Finance result and reconstructed ledger metrics for one payment period. It is intended as the monthly operational sign-off view before moving to production.\n

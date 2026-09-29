@@ -1,15 +1,28 @@
 # PROJECT_STATE
 
 ## Current Status
-Phase 23 - Monthly close report added. The platform now covers two-dump monthly processing, persisted earnings, source/QC exports, author-level payout preview/batches, QC-gated freeze, fixed UWT export, Finance UWT result reconciliation, and cycle-close reporting.
+Phase 32 - Operational monthly control report added.
 
-## Remaining production validation
-- Run the real May-August processed files through the local application.
-- Compare exact source row counts and field mappings against processed outputs.
-- Validate contract RS, PAN/TDS, recovery, adjustment, compliance, N2A/A2A parent-child and Novel/Series classification using the source workbooks.
-- Confirm Finance matching keys and UWT field-level parity.
-- Correct any differences found by reconciliation reports before production use.
-- Then connect Lovable for the polished frontend/auth/deployment.
+## Implemented
+- Two-dump monthly processing
+- Persistent source row lineage
+- Eligibility and N2A/A2A incentive exclusion
+- Novel / Series / N2A/A2A dimensions
+- Author-level CSV and QC CSV
+- Contract/PAN/TDS/compliance reference masters
+- Recovery and adjustment staging
+- Configurable Marketing/COP caps
+- Payout batch, line QC and freeze gate
+- UWT import/reconciliation and fixed-format export foundation
+- Finance -> reconstructed ledger allocation foundation
+- Monthly close report
+- Detailed Author/Book/Show parity report
+- Monthly operational control report
 
-## Core invariant
-No payout batch should be considered frozen/exportable until the required QC and reconciliation gates pass.
+## Final validation work
+1. Run real processed May-August source files in Codespaces.
+2. Validate exact field mappings and Finance matching keys.
+3. Resolve BLOCK/REVIEW cases and compare all historical totals.
+4. Connect detailed Author/Book/Show drill-down UI.
+5. Add production auth/storage/RLS.
+6. Move approved frontend to Lovable.
