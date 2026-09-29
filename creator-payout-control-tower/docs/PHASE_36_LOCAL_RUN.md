@@ -1,0 +1,1 @@
+# Phase 36 - One-command local preview\n\nThe project root now has a package.json so `npm run dev` works from `creator-payout-control-tower/` and forwards the command to the Vite frontend. Backend remains a separate process on port 8000.\n

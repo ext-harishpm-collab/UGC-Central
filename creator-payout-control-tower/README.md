@@ -1,23 +1,28 @@
 # Creator Payout Control Tower
 
-Local-first internal payout operations platform.
+## One-command frontend preview from this folder
 
-## Run in Codespaces
-
-Frontend:
 ```bash
-cd /workspaces/UGC-Central/creator-payout-control-tower/frontend
-npm install
-npm run dev -- --host 0.0.0.0
+npm run dev
 ```
 
-Backend:
+This starts Vite from the `frontend` directory. Codespaces will expose port 5173.
+
+## Backend in a second terminal
+
 ```bash
-cd /workspaces/UGC-Central/creator-payout-control-tower/backend
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-python -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cd backend
+npm run dev:backend
 ```
 
-Lovable remains deferred until historical parity, calculations, QC, UWT reconciliation and ledger validation are complete.
+Or:
+
+```bash
+npm run dev:backend
+```
+
+from the project root if Python dependencies are installed in the environment.
+
+## Workflow
+
+Monthly Cycle -> upload Incentive + Revenue Share dumps -> process -> review Author Level -> export Author CSV + QC CSV -> Payout -> Batch QC -> Freeze -> UWT -> Finance result -> Ledger.
