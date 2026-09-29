@@ -10,7 +10,8 @@ from .api.final_routes import router as final_router
 from .api.uwt_final_routes import router as uwt_final_router
 from .api.close_routes import router as close_router
 from .api.parity_routes import router as parity_router
-app=FastAPI(title="Creator Payout Control Tower",version="0.24.0")
+from .api.validation_routes import router as validation_router
+app=FastAPI(title="Creator Payout Control Tower",version="0.25.0")
 Base.metadata.create_all(bind=engine)
 ensure_local_schema()
 app.add_middleware(CORSMiddleware,allow_origins=["*"],allow_credentials=True,allow_methods=["*"],allow_headers=["*"])
@@ -21,5 +22,6 @@ app.include_router(final_router,prefix="/api")
 app.include_router(uwt_final_router,prefix="/api")
 app.include_router(close_router,prefix="/api")
 app.include_router(parity_router,prefix="/api")
+app.include_router(validation_router,prefix="/api")
 @app.get("/")
-def root():return {"service":"Creator Payout Control Tower","status":"ok","phase":24}
+def root():return {"service":"Creator Payout Control Tower","status":"ok","phase":25}
