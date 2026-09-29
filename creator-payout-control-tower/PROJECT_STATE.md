@@ -1,40 +1,29 @@
 # PROJECT_STATE
 
 ## Current Status
-Phase 4 - Calculation, mandatory QC and reconciliation foundation implemented. Frontend now exposes Historical Import and Calculation & QC local views.
+Phase 14 - Historical validation harness added. Local operations UI, historical import, earnings ingestion, payout preview/batch, UWT result processing, recovery/adjustment staging, configurable caps and mandatory QC foundation are implemented.
 
-## Decisions Made
-- GitHub repository: ext-harishpm-collab/UGC-Central
-- Lovable remains deferred until core calculation, QC, UWT reconciliation and historical validation are stable.
-- Raw source files remain immutable evidence.
-- Historical records remain persistent and queryable.
-- UWT remains a fixed external format.
-- SUCCESS / FAILED / REVERSED / UNMATCHED are normalized internally.
-- Only successful payments can provide successful-payment bank evidence.
-- Marketing/COP/payment-threshold rules are configurable and effective-dated.
-- Blocking QC prevents a record from being treated as ready for payout.
+## Historical Baseline
+Supplied processed workbooks observed:
+- May UWT: processed 899, failed 257, reversed 12
+- June UWT: processed 866, failed 254, reversed 18
+- July UWT: processed 1069, failed 237, reversed 27
+- August Finance copy: UTR Details has 604 processed rows
 
-## Current Technical Scope
-- XLSX/XLSM inspection and import
-- Raw row provenance
-- Normalized payment events
-- Author/content/payment master foundation
-- Configurable rule storage
-- Calculation API
-- QC API
-- UWT/Finance reconciliation API
-- Local browser UI for import and calculation/QC
-
-## Known Issues / Open Business Decisions
-- Exact Finance result matching key must be confirmed by historical workbook validation; deterministic fallback currently uses payout ID, UTR, then Author + Book + Amount.
-- Final marketing/COP cap semantics need business confirmation where contracts differ.
-- Final Finance UWT export field formatting and success/failed/reversal source sheets need field-level validation against all historical months.
-- Production Supabase/auth/RLS intentionally deferred.
+## Decisions
+- Raw source files are not stored in the public GitHub repository.
+- Historical records are persistent; imported source rows retain provenance.
+- UWT remains the fixed 13-column external Finance interface.
+- SUCCESS is the only successful-payment evidence allowed to validate bank account history.
+- FAILED and REVERSED remain retryable.
+- Novel, Series and N2A/A2A are separate operating dimensions.
+- Payout batches start DRAFT_QC_REQUIRED and cannot be frozen until QC PASS.
+- Marketing/COP/threshold rules are configurable and effective-dated.
+- Lovable remains deferred until historical parity.
 
 ## Next Actions
-1. Validate May-Aug historical workbooks through the import pipeline.
-2. Build master matching and content classification from actual source sheets.
-3. Build payout-line consolidation and reward lineage.
-4. Build full UWT result import and Show-level ledger generator.
-5. Add automated month-by-month reconciliation report.
-6. Only after historical parity, move the UI to Lovable.
+1. Run the validation harness against May-Aug workbooks in Codespaces.
+2. Resolve exact field mappings for UWT/UTR, Author Level, Fin Success, Inc Final, RS Final and Show Book Mapping.
+3. Implement contract-effective RS, PAN/TDS and compliance QC from the actual source sheets.
+4. Complete Show-level UWT ledger reconstruction and fixed-export parity.
+5. Reconcile the system with all processed monthly outputs.
