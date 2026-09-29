@@ -1,0 +1,1 @@
+# Phase 12 - API-backed operations UI\n\nThe local browser preview now reads real month/content ledger data from the backend and exposes dedicated Novel, Series, N2A/A2A, Monthly Cycle, UWT, Rules and Exceptions views. It remains local-first and does not require Lovable.\n

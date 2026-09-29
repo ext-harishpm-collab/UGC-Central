@@ -1,20 +1,68 @@
-import {useEffect,useState} from "react";
-const NAV=["Dashboard","Monthly Cycle","Author","Book","Show","Novel","Series","N2A/A2A","UWT","Ledger","Exceptions","Rules","Historical Import","Calculation & QC"];
-const sample=[["SHOW-10021","BOOK-20021","AUTH-30021","NOVEL",18425.5,"SUCCESS"],["SHOW-10022","BOOK-20022","AUTH-30022","SERIES",12840,"FAILED"],["SHOW-10023","BOOK-20023","AUTH-30023","N2A/A2A",9210.25,"REVERSED"]];
-export default function App(){
- const[page,setPage]=useState("Dashboard"),[api,setApi]=useState("checking"),[month,setMonth]=useState("August 2026"),[view,setView]=useState("All");
- const[file,setFile]=useState<File|null>(null),[busy,setBusy]=useState(false),[result,setResult]=useState<any>(null);
- const[inputs,setInputs]=useState({incentive:100,revenue_share:900,other:0,marketing:100,platform:0,cop:0,flat:0,recovery:0,adjustment:0,tds_rate:10}),[calc,setCalc]=useState<any>(null),[qc,setQc]=useState<any>(null);
- const[marketing,setMarketing]=useState(30),[cop,setCop]=useState(30),[threshold,setThreshold]=useState(100);
- useEffect(()=>{fetch("/api/health").then(r=>r.json()).then(()=>setApi("online")).catch(()=>setApi("offline"))},[]);
- const rows=sample.filter(r=>view==="All"||r[3]===view);
- const upd=(k:string,v:string)=>setInputs({...inputs,[k]:Number(v)});
- async function doCalc(){const r=await fetch("/api/calculate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...inputs,tds_rate:inputs.tds_rate/100})});setCalc(await r.json())}
- async function doQC(){const r=await fetch("/api/qc/run",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({author_id:"DEMO",content_type:"NOVEL",incentive:inputs.incentive,contract_rs:7,product_rs:7,bank_ok:true,pan_ok:true,previously_paid:false,recovery_double:false,adjustment_reason:true,payment_threshold:threshold,final_net:Number(calc?.net_payable||0)})});setQc(await r.json())}
- async function doBackfill(){if(!file)return;setBusy(true);setResult(null);const fd=new FormData();fd.append("files",file);try{const r=await fetch("/api/historical/backfill",{method:"POST",body:fd});setResult(await r.json())}catch{setResult({error:"Backend offline"})}finally{setBusy(false)}}
- async function doUwt(){if(!file)return;setBusy(true);setResult(null);const fd=new FormData();fd.append("file",file);try{const r=await fetch("/api/uwt/import",{method:"POST",body:fd});setResult(await r.json())}catch{setResult({error:"Backend offline"})}finally{setBusy(false)}}
- return <div className="app"><aside className="sidebar"><div className="brand">Creator Payout<br/>Control Tower</div>{NAV.map(x=><div key={x} className={x===page?"nav active":"nav"} onClick={()=>setPage(x)}>{x}</div>)}</aside><main className="main">
- {page==="Historical Import"?<><header><div><div className="eyebrow">PHASE 10</div><h1>Historical Import</h1><p>Backfill history and inspect Finance/UWT payment results.</p></div></header><section className="grid2"><div className="panel"><h2>Historical master backfill</h2><input type="file" accept=".xlsx,.xlsm" onChange={e=>setFile(e.target.files?.[0]??null)}/><button disabled={!file||busy} onClick={doBackfill}>{busy?"Processing...":"Backfill Workbook"}</button></div><div className="panel"><h2>Finance UWT import</h2><p className="muted">Use the fixed UWT workbook. Success closes the ledger; failed/reversed remain retryable.</p><button disabled={!file||busy} onClick={doUwt}>Import UWT Result</button></div></section>{result&&<section className="panel"><pre className="result">{JSON.stringify(result,null,2)}</pre></section></>
- :page==="Calculation & QC"?<><header><div><div className="eyebrow">PHASE 10</div><h1>Calculation & QC</h1><p>Transparent calculations with mandatory QC and adjustable caps.</p></div></header><section className="grid2"><div className="panel"><h2>Payout Calculation</h2>{Object.entries(inputs).map(([k,v])=><label key={k}>{k.replaceAll("_"," ")}<input value={v} onChange={e=>upd(k,e.target.value)}/></label>)}<button onClick={doCalc}>Calculate</button>{calc&&<pre className="result">{JSON.stringify(calc,null,2)}</pre>}</div><div className="panel"><h2>Rules & QC</h2><label>Marketing Cap %<input value={marketing} onChange={e=>setMarketing(Number(e.target.value))}/></label><label>COP Cap %<input value={cop} onChange={e=>setCop(Number(e.target.value))}/></label><label>Payment Threshold<input value={threshold} onChange={e=>setThreshold(Number(e.target.value))}/></label><button disabled={!calc} onClick={doQC}>Run Mandatory QC</button>{qc&&<pre className="result">{JSON.stringify(qc,null,2)}</pre>}</div></section></>
- :<><header><div><div className="eyebrow">PHASE 10 LOCAL PREVIEW</div><h1>Payment Operations</h1><p>Historical foundation, payout calculation, QC, UWT and ledger controls.</p></div><div className="controls"><select value={month} onChange={e=>setMonth(e.target.value)}><option>August 2026</option><option>July 2026</option><option>June 2026</option><option>May 2026</option></select><select value={view} onChange={e=>setView(e.target.value)}><option>All</option><option>NOVEL</option><option>SERIES</option><option>N2A/A2A</option></select></div></header><section className="cards">{[["Ready for Payout","2,341"],["On Hold","145"],["Gross","₹52.44M"],["Net Payable","₹21.18M"],["Success","2,301"],["Retry Pool","40"]].map(([a,b])=><div className="card" key={a}><span>{a}</span><strong>{b}</strong></div>)}</section><section className="panel"><div className="panelHead"><div><h2>Show-Level Payment Ledger</h2><p>{month} · {view}</p></div><span className="health">API {api}</span></div><table><thead><tr><th>Show ID</th><th>Book ID</th><th>Author ID</th><th>Type</th><th>Net</th><th>Status</th></tr></thead><tbody>{rows.map(r=><tr key={r[0]}><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td><td>{r[3]}</td><td>₹{Number(r[4]).toLocaleString("en-IN",{minimumFractionDigits:2})}</td><td><span className={"pill "+String(r[5]).toLowerCase()}>{r[5]}</span></td></tr>)}</tbody></table></section></>}
- </main></div>
+import { useEffect, useState } from "react";
+
+const NAV = ["Dashboard","Monthly Cycle","Novel","Series","N2A/A2A","UWT","Ledger","Exceptions","Rules","Author","Book","Show","Historical Import","Calculation & QC"];
+const typeFor = (p:string) => p === "Novel" ? "NOVEL" : p === "Series" ? "SERIES" : p === "N2A/A2A" ? "N2A/A2A" : undefined;
+
+export default function App() {
+  const [page,setPage] = useState("Dashboard");
+  const [month,setMonth] = useState("August 2026");
+  const [api,setApi] = useState("checking");
+  const [rows,setRows] = useState<any[]>([]);
+  const [summary,setSummary] = useState<any>(null);
+  const [exceptions,setExceptions] = useState<any[]>([]);
+  const [rules,setRules] = useState<any>(null);
+
+  useEffect(() => {
+    fetch("/api/health").then(r=>r.json()).then(()=>setApi("online")).catch(()=>setApi("offline"));
+  }, []);
+
+  useEffect(() => {
+    if (["Dashboard","Monthly Cycle","Novel","Series","N2A/A2A","Ledger"].includes(page)) loadLedger();
+    if (page === "Exceptions") loadExceptions();
+    if (page === "Rules") loadRules();
+  }, [page,month]);
+
+  async function loadLedger() {
+    const t=typeFor(page);
+    const url=t ? `/api/ledger?month=${encodeURIComponent(month)}&content_type=${encodeURIComponent(t)}` : `/api/ledger?month=${encodeURIComponent(month)}`;
+    const data=await fetch(url).then(r=>r.json()).catch(()=>[]);
+    const s=await fetch(`/api/month/breakdown?month=${encodeURIComponent(month)}`).then(r=>r.json()).catch(()=>null);
+    setRows(Array.isArray(data)?data:[]); setSummary(s);
+  }
+
+  async function loadExceptions() { setExceptions(await fetch(`/api/exceptions?period=${encodeURIComponent(month)}`).then(r=>r.json()).catch(()=>[])); }
+  async function loadRules() { setRules(await fetch(`/api/config/rules?period=${encodeURIComponent(month)}`).then(r=>r.json()).catch(()=>null)); }
+
+  const stats=summary?.status || {};
+  return <div className="app">
+    <aside className="sidebar"><div className="brand">Creator Payout<br/>Control Tower</div>
+      {NAV.map(x=><div key={x} className={x===page?"nav active":"nav"} onClick={()=>setPage(x)}>{x}</div>)}
+    </aside>
+    <main className="main">
+      <header><div><div className="eyebrow">LOCAL DEVELOPMENT</div><h1>{page}</h1><p>{month} · API {api}</p></div>
+        <select value={month} onChange={e=>setMonth(e.target.value)}><option>August 2026</option><option>July 2026</option><option>June 2026</option><option>May 2026</option></select>
+      </header>
+
+      {["Dashboard","Novel","Series","N2A/A2A","Ledger"].includes(page) && <>
+        <section className="cards">
+          {[["Rows",rows.length],["Success",stats.SUCCESS?.count||0],["Failed",stats.FAILED?.count||0],["Reversed",stats.REVERSED?.count||0],["Unmatched",stats.UNMATCHED?.count||0],["Content Groups",Object.keys(summary?.content||{}).length]].map(([a,b])=><div className="card" key={a}><span>{a}</span><strong>{b}</strong></div>)}
+        </section>
+        <section className="panel"><h2>Show-Level Ledger</h2><p>{page==="Dashboard"?"All content":page}</p>
+          <div className="tableWrap"><table><thead><tr><th>Show ID</th><th>Book ID</th><th>Author ID</th><th>Content</th><th>Net</th><th>Status</th><th>Ledger</th><th>UTR</th></tr></thead>
+          <tbody>{rows.slice(0,500).map(r=><tr key={r.payment_id}><td>{r.show_id||"-"}</td><td>{r.book_id||"-"}</td><td>{r.author_id||"-"}</td><td>{r.content_type||"UNKNOWN"}</td><td>{r.amount_after_tax==null?"-":"₹"+Number(r.amount_after_tax).toLocaleString("en-IN",{minimumFractionDigits:2})}</td><td><span className={"pill "+String(r.status).toLowerCase()}>{r.status}</span></td><td>{r.ledger_state}</td><td>{r.utr||"-"}</td></tr>)}</tbody></table></div>
+        </section>
+      </>}
+
+      {page==="Monthly Cycle" && <section className="grid2"><div className="panel"><h2>Monthly Breakdown</h2><pre className="result">{JSON.stringify(summary,null,2)}</pre></div><div className="panel"><h2>Processing Gate</h2><div className="checks"><div>✓ Import validation</div><div>✓ Calculation layer</div><div>✓ Mandatory QC layer</div><div>✓ UWT reconciliation layer</div><div>○ Historical parity validation</div></div></div></section>}
+
+      {page==="Exceptions" && <section className="panel"><h2>Exception Queue · {exceptions.length}</h2>{exceptions.length===0?<p>No open exceptions for {month}.</p>:<table><thead><tr><th>Rule</th><th>Severity</th><th>Entity</th><th>Message</th></tr></thead><tbody>{exceptions.map((x:any,i)=><tr key={i}><td>{x.rule_id}</td><td>{x.severity}</td><td>{x.entity_type} / {x.entity_id}</td><td>{x.message}</td></tr>)}</tbody></table>}</section>}
+
+      {page==="Rules" && <section className="panel"><h2>Effective Rules</h2><pre className="result">{JSON.stringify(rules,null,2)}</pre></section>}
+
+      {page==="UWT" && <section className="panel"><h2>Finance UWT</h2><p>Use the backend API docs to test the fixed 13-column UWT import/export while the frontend controls are being hardened.</p><a href="/docs" target="_blank">Open API docs</a></section>}
+      {page==="Historical Import" && <section className="panel"><h2>Historical Import</h2><p>Upload previous-month processed workbooks through the existing import endpoint.</p><a href="/docs" target="_blank">Open API docs</a></section>}
+      {page==="Calculation & QC" && <section className="panel"><h2>Calculation & QC</h2><p>Calculation and mandatory QC endpoints are live in the local backend.</p><a href="/docs" target="_blank">Open API docs</a></section>}
+      {["Author","Book","Show"].includes(page) && <section className="panel"><h2>{page} Explorer</h2><p>Entity-level APIs are available; the detailed drill-down UI will be connected after historical parity testing.</p></section>}
+    </main>
+  </div>;
+}
