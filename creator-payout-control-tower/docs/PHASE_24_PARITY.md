@@ -1,0 +1,1 @@
+# Phase 24 - Detailed parity\n\nCompare earning-side gross and Finance payment-side net grouped by Author, Book, Show and content type. Mismatches are REVIEW only and are not automatically corrected.\n
