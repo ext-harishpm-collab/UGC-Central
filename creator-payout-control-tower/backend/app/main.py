@@ -4,7 +4,7 @@ from .db.session import Base, engine
 from .models import *  # noqa: F401,F403
 from .api.routes import router
 
-app = FastAPI(title="Creator Payout Control Tower", version="0.1.0")
+app = FastAPI(title="Creator Payout Control Tower", version="0.2.0")
 
 Base.metadata.create_all(bind=engine)
 
@@ -20,4 +20,4 @@ app.include_router(router, prefix="/api")
 
 @app.get("/")
 def root():
-    return {"service": "Creator Payout Control Tower", "phase": 1, "status": "ok"}
+    return {"service": "Creator Payout Control Tower", "phase": 2, "status": "ok"}
