@@ -82,6 +82,9 @@ class PaymentTransaction(Base):
     payment_period:Mapped[str|None]=mapped_column(String(64),index=True)
     content_type:Mapped[str|None]=mapped_column(String(32),index=True)
     ledger_state:Mapped[str]=mapped_column(String(32),default="OPEN",index=True)
+    account_number:Mapped[str|None]=mapped_column(String(128))
+    ifsc:Mapped[str|None]=mapped_column(String(32))
+    bank_name:Mapped[str|None]=mapped_column(String(255))
 
 class RuleConfig(Base):
     __tablename__="rule_configs"
