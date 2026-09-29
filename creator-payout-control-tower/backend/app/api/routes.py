@@ -11,21 +11,27 @@ from ..services.calculation_service import calculate
 from ..services.qc_service import run_qc
 from ..services.reconciliation_service import reconcile
 from ..services.uwt_service import FIXED_COLUMNS
+from ..services.uwt_import_service import import_uwt_workbook,fixed_uwt_rows
 from ..services.month_service import month_breakdown
 from ..services.historical_service import backfill_files
 from ..services.earning_service import ingest_earnings,preview_author_payouts
 from ..services.payout_service import build_preview
 from ..services.exception_service import open_exceptions
+from ..services.entity_service import author_360,content_360
 import tempfile,shutil
 
 router=APIRouter()
-class RulePayload(BaseModel):rule_key:str;value:float|None=None;effective_from:str|None=None;effective_to:str|None=None;reason:str|None=None;approved_by:str|None=None
-class CalcPayload(BaseModel):incentive:float=0;revenue_share:float=0;other:float=0;marketing:float=0;platform:float=0;cop:float=0;flat:float=0;recovery:float=0;adjustment:float=0;tds_rate:float=0
-class QCInput(BaseModel):author_id:str|None=None;content_type:str|None=None;incentive:float=0;contract_rs:float|None=None;product_rs:float|None=None;bank_ok:bool=False;pan_ok:bool=False;previously_paid:bool=False;recovery_double:bool=False;adjustment_reason:bool=True;payment_threshold:float=100;final_net:float=0
-class ReconInput(BaseModel):payout_id:str|None=None;utr:str|None=None;author_id:str|None=None;book_id:str|None=None;amount:float|None=None;raw_status:str|None=None
+class RulePayload(BaseModel):
+    rule_key:str;value:float|None=None;effective_from:str|None=None;effective_to:str|None=None;reason:str|None=None;approved_by:str|None=None
+class CalcPayload(BaseModel):
+    incentive:float=0;revenue_share:float=0;other:float=0;marketing:float=0;platform:float=0;cop:float=0;flat:float=0;recovery:float=0;adjustment:float=0;tds_rate:float=0
+class QCInput(BaseModel):
+    author_id:str|None=None;content_type:str|None=None;incentive:float=0;contract_rs:float|None=None;product_rs:float|None=None;bank_ok:bool=False;pan_ok:bool=False;previously_paid:bool=False;recovery_double:bool=False;adjustment_reason:bool=True;payment_threshold:float=100;final_net:float=0
+class ReconInput(BaseModel):
+    payout_id:str|None=None;utr:str|None=None;author_id:str|None=None;book_id:str|None=None;amount:float|None=None;raw_status:str|None=None
 
 @router.get("/health")
-def health():return {"status":"ok","phase":8}
+def health():return {"status":"ok","phase":10}
 @router.get("/status/normalize/{raw_status}")
 def status(raw_status:str):return {"input":raw_status,"normalized":normalize_payment_status(raw_status).value}
 @router.get("/config/rules")
@@ -52,6 +58,7 @@ def historical_backfill(files:list[UploadFile]=File(...)):
     paths=[]
     try:
         for f in files:
+            if not (f.filename or "").lower().endswith((".xlsx",".xlsm")):raise HTTPException(400,"XLSX/XLSM only")
             with tempfile.NamedTemporaryFile(suffix=Path(f.filename or "").suffix,delete=False) as tmp:shutil.copyfileobj(f.file,tmp);paths.append(tmp.name)
         return backfill_files(paths)
     finally:
@@ -61,9 +68,21 @@ def historical_earnings(file:UploadFile=File(...),period:str|None=None):
     with tempfile.NamedTemporaryFile(suffix=Path(file.filename or "").suffix,delete=False) as tmp:shutil.copyfileobj(file.file,tmp);path=tmp.name
     try:return ingest_earnings(path,period)
     finally:Path(path).unlink(missing_ok=True)
+@router.post("/uwt/import")
+def uwt_import(file:UploadFile=File(...)):
+    name=file.filename or ""
+    if not name.lower().endswith((".xlsx",".xlsm")):raise HTTPException(400,"Only XLSX/XLSM are supported")
+    with tempfile.NamedTemporaryFile(suffix=Path(name).suffix,delete=False) as tmp:shutil.copyfileobj(file.file,tmp);path=tmp.name
+    try:return import_uwt_workbook(path)
+    finally:Path(path).unlink(missing_ok=True)
+@router.get("/uwt/rows")
+def uwt_rows(period:str|None=None,status:str|None=None):return fixed_uwt_rows(period,status)
+@router.get("/author/{author_id}/360")
+def author_view(author_id:str,period:str|None=None):return author_360(author_id,period)
+@router.get("/content/{content_id}/360")
+def content_view(content_id:str,period:str|None=None):return content_360(content_id,period)
 @router.get("/payout/preview")
-def payout_preview(period:str,marketing_cap:float|None=None,cop_cap:float|None=None,cap_mode:str="INDIVIDUAL",tds_rate:float=0):
-    return build_preview(period,marketing_cap,cop_cap,cap_mode,tds_rate)
+def payout_preview(period:str,marketing_cap:float|None=None,cop_cap:float|None=None,cap_mode:str="INDIVIDUAL",tds_rate:float=0):return build_preview(period,marketing_cap,cop_cap,cap_mode,tds_rate)
 @router.get("/exceptions")
 def exceptions(period:str|None=None):return open_exceptions(period)
 @router.get("/master/summary")
