@@ -1,49 +1,58 @@
+from pathlib import Path
+import io,json,tempfile,shutil,zipfile
 from fastapi import APIRouter,UploadFile,File,HTTPException
 from fastapi.responses import StreamingResponse
 from ..services.dual_dump_service import process_two_dumps,csv_bytes
-import tempfile,shutil,zipfile,io
-
+from ..db.session import SessionLocal
+from ..models import Earning,QCResult
 router=APIRouter()
 
 @router.post("/monthly/process-two-dumps")
-def monthly_process_two_dumps(incentive_dump:UploadFile=File(...), revenue_share_dump:UploadFile=File(...), period:str=""):
-    if not period: raise HTTPException(400,"period is required")
+def process_two_dumps_route(incentive_dump:UploadFile=File(...),revenue_share_dump:UploadFile=File(...),period:str=""):
+    if not period:return HTTPException(400,"period is required")
     paths=[]
     try:
-        for f in [incentive_dump,revenue_share_dump]:
-            if not (f.filename or "").lower().endswith((".xlsx",".xlsm")): raise HTTPException(400,"XLSX/XLSM only")
-            with tempfile.NamedTemporaryFile(suffix=".xlsx",delete=False) as tmp:
+        for f in (incentive_dump,revenue_share_dump):
+            if not (f.filename or "").lower().endswith((".xlsx",".xlsm")):raise HTTPException(400,"Only XLSX/XLSM files are supported")
+            with tempfile.NamedTemporaryFile(suffix=Path(f.filename or "").suffix,delete=False) as tmp:
                 shutil.copyfileobj(f.file,tmp);paths.append(tmp.name)
-        result=process_two_dumps(paths[0],paths[1],period)
-        return result
+        return process_two_dumps(paths[0],paths[1],period)
     finally:
-        for p in paths:
-            import os
-            try:os.unlink(p)
-            except OSError:pass
+        for p in paths:Path(p).unlink(missing_ok=True)
 
-@router.post("/monthly/export-qc-pack")
-def monthly_export_qc_pack(incentive_dump:UploadFile=File(...), revenue_share_dump:UploadFile=File(...), period:str=""):
-    if not period: raise HTTPException(400,"period is required")
-    paths=[]
+@router.get("/monthly/author-level/export")
+def author_level_export(period:str):
+    db=SessionLocal()
     try:
-        for f in [incentive_dump,revenue_share_dump]:
-            with tempfile.NamedTemporaryFile(suffix=".xlsx",delete=False) as tmp:shutil.copyfileobj(f.file,tmp);paths.append(tmp.name)
-        result=process_two_dumps(paths[0],paths[1],period)
-        author_h=["period","author_id","incentive_gross","revenue_share_gross","gross","source_row_count","source_refs"]
-        show_h=["period","author_id","book_id","show_id","incentive_gross","revenue_share_gross","gross","source_row_count","sources"]
-        qc_h=["severity","rule_id","message","author_id","book_id","show_id","source_sheet","source_row"]
-        z=io.BytesIO()
-        with zipfile.ZipFile(z,"w",zipfile.ZIP_DEFLATED) as q:
-            q.writestr("Author_Level.csv",csv_bytes(result["author_level_rows"],author_h))
-            q.writestr("Show_Level_Lineage.csv",csv_bytes(result["show_level_rows"],show_h))
-            q.writestr("QC_Results.csv",csv_bytes(result["qc_rows"],qc_h))
-            q.writestr("QC_Summary.json",__import__("json").dumps(result["qc_summary"],indent=2))
-            q.writestr("Process_Summary.json",__import__("json").dumps(result["input_summary"],indent=2))
-        z.seek(0)
-        return StreamingResponse(z,media_type="application/zip",headers={"Content-Disposition":f'attachment; filename="payout_qc_pack_{period.replace(" ","_")}.zip"'})
-    finally:
-        for p in paths:
-            import os
-            try:os.unlink(p)
-            except OSError:pass
+        rows=db.query(Earning).filter(Earning.payment_period==period).all()
+        grouped={}
+        for e in rows:
+            if not e.author_id:continue
+            g=grouped.setdefault(e.author_id,{"inc":0.0,"rs":0.0,"gross":0.0,"count":0,"refs":[],"qc":set(),"types":set()})
+            included=e.exclusion_reason is None
+            if included:
+                if e.reward_type=="INCENTIVE":g["inc"]+=float(e.gross or 0)
+                if e.reward_type=="REVENUE_SHARE":g["rs"]+=float(e.gross or 0)
+                g["gross"]+=float(e.gross or 0)
+            g["count"]+=1;g["types"].add(e.content_type or "UNKNOWN");g["refs"].append(f"{e.source_file}:{e.source_sheet}:R{e.source_row}")
+        qc= db.query(QCResult).filter(QCResult.period==period).all()
+        by_entity={q.entity_id for q in qc}
+        out=[]
+        for aid,g in grouped.items():
+            out.append({"Payment Period":period,"Author ID":aid,"Incentive Gross":g["inc"],"Gross Revenue Share":g["rs"],"Other Earnings":0,
+                        "Gross Payable":g["gross"],"Recovery Applied":0,"Manual Adjustment":0,"TDS Amount":"",
+                        "Final Net Payable":"","Content Type":" / ".join(sorted(g["types"])),"QC Status":"REVIEW" if by_entity else "SOURCE_QC_APPLIED",
+                        "QC Findings":"See QC_Results.csv","Source References":" | ".join(g["refs"])})
+        headers=["Payment Period","Author ID","Incentive Gross","Gross Revenue Share","Other Earnings","Gross Payable","Recovery Applied","Manual Adjustment","TDS Amount","Final Net Payable","Content Type","QC Status","QC Findings","Source References"]
+        return StreamingResponse(io.BytesIO(csv_bytes(out,headers)),media_type="text/csv",headers={"Content-Disposition":f'attachment; filename="Author_Level_{period.replace(" ","_")}.csv"'})
+    finally:db.close()
+
+@router.get("/monthly/qc/export")
+def qc_export(period:str):
+    db=SessionLocal()
+    try:
+        rows=db.query(QCResult).filter(QCResult.period==period).all()
+        out=[{"Period":r.period,"Entity":r.entity_id,"Rule ID":r.rule_id,"Severity":r.severity,"Message":r.message,"Detected":r.detected_value,"Expected":r.expected_value,"Status":r.status} for r in rows]
+        headers=["Period","Entity","Rule ID","Severity","Message","Detected","Expected","Status"]
+        return StreamingResponse(io.BytesIO(csv_bytes(out,headers)),media_type="text/csv",headers={"Content-Disposition":f'attachment; filename="QC_Results_{period.replace(" ","_")}.csv"'})
+    finally:db.close()
