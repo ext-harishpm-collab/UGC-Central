@@ -1,0 +1,1 @@
+# Phase 20 - Contract, PAN/TDS and compliance reference masters\n\nAdded uploadable reference-master adapters for contract, PAN/TDS and compliance workbooks. Every loaded row retains source file, sheet and row. PAN/TDS rate is treated as source-validated data when supplied; absent values are reviewable rather than guessed.\n
