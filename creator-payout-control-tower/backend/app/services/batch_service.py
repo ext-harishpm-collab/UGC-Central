@@ -2,29 +2,28 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 from ..db.session import SessionLocal
-from ..models import PayoutBatch,PayoutLine,PayoutLineEarning
+from ..models import PayoutBatch,PayoutLine,PayoutLineEarning,QCResult
 from .payout_service import build_preview
+from .batch_qc_service import run_batch_qc
 
-def create_draft_batch(period,marketing_cap=None,cop_cap=None,cap_mode="INDIVIDUAL",tds_rate=0):
+def create_draft_batch(period,marketing_cap=None,cop_cap=None,cap_mode="INDIVIDUAL",tds_rate=None):
     preview=build_preview(period,marketing_cap,cop_cap,cap_mode,tds_rate)
     db=SessionLocal()
     try:
         batch_id=uuid.uuid4().hex
-        batch=PayoutBatch(id=batch_id,payment_period=period,status="DRAFT_QC_REQUIRED",notes="Generated from payout preview; not frozen.")
+        batch=PayoutBatch(id=batch_id,payment_period=period,status="DRAFT_QC_REQUIRED",notes="Generated from source-backed payout preview. Detailed QC required before freeze.")
         db.add(batch)
         for item in preview:
             line=PayoutLine(id=uuid.uuid4().hex,batch_id=batch_id,payment_period=period,author_id=item["author_id"],
-                            gross_incentive=Decimal(str(item.get("gross_incentive",0))),gross_revenue_share=Decimal(str(item.get("gross_revenue_share",0))),
-                            other_earnings=Decimal(str(item.get("other_earnings",0))),gross_payable=Decimal(str(item["gross_payable"])),
-                            marketing=Decimal(str(item.get("marketing",0))),platform=Decimal(str(item.get("platform",0))),
-                            cop=Decimal(str(item.get("cop",0))),flat_deduction=Decimal(str(item.get("flat",0))),
-                            recovery=Decimal(str(item.get("recovery",0))),adjustment=Decimal(str(item.get("adjustment",0))),
-                            tds=Decimal(str(item["tds"])),net_payable=Decimal(str(item["net_payable"])),qc_status="NOT_RUN",freeze_status="OPEN")
+                gross_incentive=Decimal(str(item.get("gross_incentive",0))),gross_revenue_share=Decimal(str(item.get("gross_revenue_share",0))),other_earnings=Decimal(str(item.get("other_earnings",0))),
+                gross_payable=Decimal(str(item.get("gross_payable",0))),marketing=Decimal(str(item.get("marketing",0))),platform=Decimal(str(item.get("platform",0))),cop=Decimal(str(item.get("cop",0))),
+                flat_deduction=Decimal(str(item.get("flat",0))),recovery=Decimal(str(item.get("recovery",0))),adjustment=Decimal(str(item.get("adjustment",0))),
+                tds=Decimal(str(item.get("tds",0))),net_payable=Decimal(str(item.get("net_payable",0))),qc_status="NOT_RUN",freeze_status="OPEN")
             db.add(line)
-            for e in item.get("lineage",[]): db.add(PayoutLineEarning(id=uuid.uuid4().hex,payout_line_id=line.id,earning_id=e["id"]))
+            for e in item.get("lineage",[]):
+                db.add(PayoutLineEarning(id=uuid.uuid4().hex,payout_line_id=line.id,earning_id=e["id"]))
         db.commit()
-        return {"batch_id":batch_id,"period":period,"status":batch.status,"line_count":len(preview),"net_payable":sum(float(x["net_payable"]) for x in preview)}
-    except Exception:db.rollback();raise
+        return {"batch_id":batch_id,"period":period,"status":batch.status,"line_count":len(preview),"net_payable":sum(float(x.get("net_payable",0)) for x in preview)}
     finally:db.close()
 
 def list_batches(period=None):
@@ -42,7 +41,9 @@ def freeze_batch(batch_id):
         if not b:return {"frozen":False,"reason":"Batch not found"}
         if b.status=="FROZEN":return {"frozen":True,"batch_id":batch_id}
         blocking=db.query(PayoutLine).filter(PayoutLine.batch_id==batch_id,PayoutLine.qc_status!="PASS").count()
-        if blocking:return {"frozen":False,"reason":"Blocking QC: payout lines must all have QC PASS","blocking_lines":blocking}
+        open_qc=db.query(QCResult).filter(QCResult.period==b.payment_period,QCResult.status=="OPEN",QCResult.severity.in_({"BLOCK","CRITICAL"})).count()
+        if blocking or open_qc:
+            return {"frozen":False,"reason":"QC gate blocked","blocking_lines":blocking,"open_blocking_qc":open_qc}
         b.status="FROZEN";b.frozen_at=datetime.utcnow()
         db.commit();return {"frozen":True,"batch_id":batch_id}
     finally:db.close()
