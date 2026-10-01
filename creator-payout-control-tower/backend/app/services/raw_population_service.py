@@ -227,6 +227,10 @@ def populate_two_dumps_raw(inc_path, rs_path, period):
         errors = inc_errors + rs_errors
 
         run_id = uuid.uuid4().hex
+        existing_runs = db.query(MonthlyRun).filter(MonthlyRun.period == period).all()
+        existing_ids = [run.id for run in existing_runs]
+        if existing_ids:
+            db.query(RawImportRow).filter(RawImportRow.batch_id.in_(existing_ids)).delete(synchronize_session=False)
         db.query(Earning).filter(Earning.payment_period == period).delete(synchronize_session=False)
         db.query(MonthlyRun).filter(MonthlyRun.period == period).delete(synchronize_session=False)
 
