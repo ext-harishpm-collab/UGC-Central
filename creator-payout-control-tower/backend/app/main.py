@@ -5,6 +5,7 @@ from .models import *
 from .migrations import ensure_local_schema
 from .api.routes import router as api_router
 from .api.monthly_routes import router as monthly_router
+from .api.raw_population_routes import router as raw_population_router
 from .api.reference_routes import router as reference_router
 from .api.final_routes import router as final_router
 from .api.uwt_final_routes import router as uwt_final_router
@@ -13,12 +14,14 @@ from .api.parity_routes import router as parity_router
 from .api.validation_routes import router as validation_router
 from .api.ledger_routes import router as ledger_router
 from .api.control_routes import router as control_router
-app=FastAPI(title="Creator Payout Control Tower",version="0.32.0")
+
+app=FastAPI(title="Creator Payout Control Tower",version="0.33.0")
 Base.metadata.create_all(bind=engine)
 ensure_local_schema()
 app.add_middleware(CORSMiddleware,allow_origins=["*"],allow_credentials=True,allow_methods=["*"],allow_headers=["*"])
 app.include_router(api_router,prefix="/api")
 app.include_router(monthly_router,prefix="/api")
+app.include_router(raw_population_router,prefix="/api")
 app.include_router(reference_router,prefix="/api")
 app.include_router(final_router,prefix="/api")
 app.include_router(uwt_final_router,prefix="/api")
@@ -27,5 +30,7 @@ app.include_router(parity_router,prefix="/api")
 app.include_router(validation_router,prefix="/api")
 app.include_router(ledger_router,prefix="/api")
 app.include_router(control_router,prefix="/api")
+
 @app.get("/")
-def root():return {"service":"Creator Payout Control Tower","status":"ok","phase":32}
+def root():
+    return {"service":"Creator Payout Control Tower","status":"ok","phase":33}
