@@ -4,7 +4,7 @@ from fastapi import APIRouter,UploadFile,File,HTTPException
 from fastapi.responses import StreamingResponse
 from ..services.dual_dump_service import process_two_dumps,csv_bytes
 from ..db.session import SessionLocal
-from ..models import Earning,QCResult
+from ..models import Earning,QCResult,RawImportRow,RuleConfig,MonthlyRun
 
 router=APIRouter()
 
@@ -23,6 +23,78 @@ def process_two_dumps_route(incentive_dump:UploadFile=File(...),revenue_share_du
     finally:
         for p in (p1,p2):
             if p: Path(p).unlink(missing_ok=True)
+
+def _mapping_key(period, stream, field):
+    return "monthly_mapping::{}::{}::{}".format(period, stream, field)
+
+
+@router.get("/monthly/column-options")
+def column_options(period: str):
+    db=SessionLocal()
+    try:
+        runs=db.query(MonthlyRun).filter(MonthlyRun.period==period).all()
+        batch_ids=[x.id for x in runs]
+        rows=db.query(RawImportRow).filter(RawImportRow.batch_id.in_(batch_ids)).all() if batch_ids else []
+        options={"INCENTIVE_DUMP":[],"REVENUE_SHARE_DUMP":[],"TDS_FACTOR":[]}
+        seen={k:set() for k in options}
+        for row in rows:
+            try: payload=json.loads(row.payload or "{}")
+            except Exception: payload={}
+            stream=row.sheet_kind
+            if stream not in {"INCENTIVE_DUMP","REVENUE_SHARE_DUMP"}:
+                continue
+            for key in payload:
+                if key and key not in seen[stream]:
+                    seen[stream].add(key)
+                    options[stream].append(key)
+                if key and "tds" in key.lower() and key not in seen["TDS_FACTOR"]:
+                    seen["TDS_FACTOR"].add(key)
+                    options["TDS_FACTOR"].append(key)
+        for key in options:
+            options[key].sort()
+        return options
+    finally:
+        db.close()
+
+
+@router.get("/monthly/column-mapping")
+def get_column_mapping(period: str):
+    db=SessionLocal()
+    try:
+        rows=db.query(RuleConfig).filter(RuleConfig.scope_type=="MONTHLY_COLUMN_MAPPING").all()
+        wanted={row.rule_key:row.value_text or "" for row in rows if row.rule_key.startswith("monthly_mapping::{}::".format(period))}
+        return {
+            "inc_gross":wanted.get(_mapping_key(period,"INCENTIVE_DUMP","gross"),""),
+            "rs_gross":wanted.get(_mapping_key(period,"REVENUE_SHARE_DUMP","gross"),""),
+            "tds_factor":wanted.get(_mapping_key(period,"ALL","tds_factor"),"")
+        }
+    finally:
+        db.close()
+
+
+@router.post("/monthly/column-mapping")
+def save_column_mapping(payload: dict):
+    period=payload.get("period")
+    if not period:
+        raise HTTPException(400,"period is required")
+    db=SessionLocal()
+    try:
+        fields={
+            _mapping_key(period,"INCENTIVE_DUMP","gross"):payload.get("inc_gross",""),
+            _mapping_key(period,"REVENUE_SHARE_DUMP","gross"):payload.get("rs_gross",""),
+            _mapping_key(period,"ALL","tds_factor"):payload.get("tds_factor","")
+        }
+        for rule_key,value in fields.items():
+            existing=db.query(RuleConfig).filter(RuleConfig.rule_key==rule_key,RuleConfig.scope_type=="MONTHLY_COLUMN_MAPPING").first()
+            if existing:
+                existing.value_text=str(value or "")
+            else:
+                db.add(RuleConfig(id=__import__("uuid").uuid4().hex,rule_key=rule_key,scope_type="MONTHLY_COLUMN_MAPPING",value_text=str(value or ""),reason="Monthly calculation source mapping"))
+        db.commit()
+        return {"saved":True,**payload}
+    finally:
+        db.close()
+
 
 @router.get("/monthly/author-level/export")
 def author_level_export(period:str):
