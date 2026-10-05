@@ -48,6 +48,12 @@ def read_dump(path,kind,db):
                          "content_type_source":ctype_source,"pay_flag":pay or None,"gross":gross,"tds":tds,"net":net})
     return rows
 def process_two_dumps(inc_path,rs_path,period):
+    # Legacy endpoint now routes to raw population only; no eligibility filtering occurs here.
+    from .raw_population_service import populate_two_dumps_raw
+    return populate_two_dumps_raw(inc_path,rs_path,period)
+
+
+def _legacy_filtered_process_two_dumps(inc_path,rs_path,period):
     db=SessionLocal()
     try:
         inc=read_dump(inc_path,"INCENTIVE_DUMP",db);rs=read_dump(rs_path,"REVENUE_SHARE_DUMP",db);all_rows=inc+rs

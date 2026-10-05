@@ -8,7 +8,7 @@ import uuid
 from openpyxl import load_workbook
 
 from ..db.session import SessionLocal
-from ..models import Earning, MonthlyRun, RawImportRow
+from ..models import Earning, MonthlyRun, RawImportRow, ContentItem
 
 
 def s(v):
@@ -61,6 +61,29 @@ def detect_header(rows):
     return None, None
 
 
+def classify_content(db, book_id, show_id, ip_type, contract_type, pay_flag, status):
+    marker = ' '.join([s(ip_type), s(contract_type), s(pay_flag), s(status)]).upper()
+    if 'N2A/A2A' in marker or 'N2A' in marker or 'A2A' in marker:
+        return 'N2A/A2A'
+    if 'SERIES' in marker:
+        return 'SERIES'
+    if 'NOVEL' in marker:
+        return 'NOVEL'
+    content = None
+    if book_id:
+        content = db.query(ContentItem).filter(ContentItem.book_id == book_id).first()
+    if not content and show_id:
+        content = db.query(ContentItem).filter(ContentItem.show_id == show_id).first()
+    if content and content.content_type:
+        value = s(content.content_type).upper()
+        if 'N2A' in value or 'A2A' in value:
+            return 'N2A/A2A'
+        if 'SERIES' in value:
+            return 'SERIES'
+        if 'NOVEL' in value:
+            return 'NOVEL'
+    return 'UNCLASSIFIED'
+
 def read_source(path, kind):
     path_obj = Path(path)
     if path_obj.suffix.lower() == ".csv":
@@ -100,13 +123,11 @@ def read_source(path, kind):
             pay_flag = s(get("Pay?", "Pay", "Eligibility", "Eligible"))
             status = s(get("Status", "Payment Status"))
 
-            marker = " ".join([ip_type, contract_type, pay_flag, status]).upper()
-            if "N2A" in marker or "A2A" in marker:
-                content_type = "N2A/A2A"
-            elif "SERIES" in marker:
-                content_type = "SERIES"
-            else:
-                content_type = "NOVEL"
+            content_type = classify_content(db, book_id, show_id, ip_type, contract_type, pay_flag, status)
+            if not author_id and book_id:
+                content = db.query(ContentItem).filter(ContentItem.book_id == book_id).first()
+                if content and content.author_id:
+                    author_id = s(content.author_id)
 
             gross_value = get("Gross", "Gross Amount", "Amount", "Balance amount", "Total Revenue")
             tds_value = get("TDS Amount", "TDS", "Processed TDS")
