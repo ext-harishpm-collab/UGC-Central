@@ -180,6 +180,7 @@ def aggregate(rows):
         "novel_rows": 0,
         "series_rows": 0,
         "n2a_rows": 0,
+        "unclassified_rows": 0,
     })
 
     for row in rows:
@@ -210,8 +211,10 @@ def aggregate(rows):
             group["series_rows"] += 1
         elif row.get("content_type") == "N2A/A2A":
             group["n2a_rows"] += 1
-        else:
+        elif row.get("content_type") == "NOVEL":
             group["novel_rows"] += 1
+        else:
+            group["unclassified_rows"] += 1
 
     result = []
     for author_id, group in sorted(grouped.items()):
@@ -229,6 +232,7 @@ def aggregate(rows):
             "novel_rows": group["novel_rows"],
             "series_rows": group["series_rows"],
             "n2a_rows": group["n2a_rows"],
+            "unclassified_rows": group["unclassified_rows"],
             "source_references": " | ".join(group["references"]),
         })
 
@@ -321,6 +325,7 @@ def populate_two_dumps_raw(inc_path, rs_path, period):
                 "series_authors": len(series_level),
                 "n2a_rows": sum(row["n2a_rows"] for row in author_level),
                 "n2a_authors": len(n2a_level),
+                "unclassified_rows": sum(row["unclassified_rows"] for row in author_level),
                 "rows_with_identity": sum(1 for row in all_rows if row["author_id"] or row["book_id"] or row["show_id"]),
                 "rows_without_identity": sum(1 for row in all_rows if not (row["author_id"] or row["book_id"] or row["show_id"])),
             },
