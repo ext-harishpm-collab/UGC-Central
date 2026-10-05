@@ -61,7 +61,33 @@ def detect_header(rows):
     return None, None
 
 
+def resolve_master_for_book(db, book_id, show_id):
+    if book_id:
+        content = db.query(ContentItem).filter(ContentItem.book_id == book_id).first()
+        if content:
+            return content
+    if show_id:
+        content = db.query(ContentItem).filter(ContentItem.show_id == show_id).first()
+        if content:
+            return content
+    return None
+
+
 def classify_content(db, book_id, show_id, ip_type, contract_type, pay_flag, status):
+    # The monthly dump is keyed back to Central Data by Book ID first.
+    content = resolve_master_for_book(db, book_id, show_id)
+    if content:
+        values = [s(content.content_type), s(content.content_subtype), s(content.relationship_type)]
+        master_marker = ' '.join(values).upper()
+        if 'N2A' in master_marker or 'A2A' in master_marker:
+            return 'N2A/A2A'
+        if 'SERIES' in master_marker:
+            return 'SERIES'
+        if 'NOVEL' in master_marker:
+            return 'NOVEL'
+
+    # Only use an explicit dump classification as a fallback when Central Data
+    # does not contain a usable classification for the Book ID.
     marker = ' '.join([s(ip_type), s(contract_type), s(pay_flag), s(status)]).upper()
     if 'N2A/A2A' in marker or 'N2A' in marker or 'A2A' in marker:
         return 'N2A/A2A'
@@ -69,19 +95,6 @@ def classify_content(db, book_id, show_id, ip_type, contract_type, pay_flag, sta
         return 'SERIES'
     if 'NOVEL' in marker:
         return 'NOVEL'
-    content = None
-    if book_id:
-        content = db.query(ContentItem).filter(ContentItem.book_id == book_id).first()
-    if not content and show_id:
-        content = db.query(ContentItem).filter(ContentItem.show_id == show_id).first()
-    if content and content.content_type:
-        value = s(content.content_type).upper()
-        if 'N2A' in value or 'A2A' in value:
-            return 'N2A/A2A'
-        if 'SERIES' in value:
-            return 'SERIES'
-        if 'NOVEL' in value:
-            return 'NOVEL'
     return 'UNCLASSIFIED'
 
 def read_source(path, kind):
@@ -123,11 +136,14 @@ def read_source(path, kind):
             pay_flag = s(get("Pay?", "Pay", "Eligibility", "Eligible"))
             status = s(get("Status", "Payment Status"))
 
+            master = resolve_master_for_book(db, book_id, show_id)
             content_type = classify_content(db, book_id, show_id, ip_type, contract_type, pay_flag, status)
-            if not author_id and book_id:
-                content = db.query(ContentItem).filter(ContentItem.book_id == book_id).first()
-                if content and content.author_id:
-                    author_id = s(content.author_id)
+            if master:
+                # Central Data is authoritative for the Book ID relationship.
+                if master.author_id:
+                    author_id = s(master.author_id)
+                if master.show_id:
+                    show_id = s(master.show_id)
 
             gross_value = get("Gross", "Gross Amount", "Amount", "Balance amount", "Total Revenue")
             tds_value = get("TDS Amount", "TDS", "Processed TDS")
@@ -158,6 +174,7 @@ def read_source(path, kind):
                 "content_type": content_type,
                 "pay_flag": pay_flag or None,
                 "status_raw": status or None,
+                "master_match": bool(master),
                 "gross": d(gross_value),
                 "tds": d(tds_value),
                 "net": d(net_value),
